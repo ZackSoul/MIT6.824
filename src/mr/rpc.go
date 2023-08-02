@@ -23,7 +23,27 @@ type ExampleReply struct {
 }
 
 // Add your RPC definitions here.
+type GetTaskRequest struct {
+	X int
+}
 
+type GetTaskResponse struct {
+	MFileName string
+	TaskName  string
+	RFileName []string
+	TaskType int //任务类别, 0:map, 1:reduce, 2:sleep
+	ReduceNumber int //需要将中间文件分组的数量
+}
+
+//worker上报任务完成状态
+type ReportStatusRequest struct {
+	FileName []string //map任务告知master节点中间文件的信息
+	TaskName string //该任务的名字
+}
+
+type ReportStatusResponse struct {
+	X int
+}
 
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the coordinator.

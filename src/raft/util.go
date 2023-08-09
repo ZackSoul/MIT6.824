@@ -8,7 +8,7 @@ import (
 )
 
 // Debugging
-const Debug = false
+const Debug = true
 
 func DPrintf(format string, a ...interface{}) (n int, err error) {
 	if Debug {
@@ -75,13 +75,13 @@ const (
 )
 
 func HeartbeatTimeout() time.Duration {
-	return 120 * time.Millisecond
-	// return time.Duration(HeartbeatTime) * time.Millisecond
+	// return 120 * time.Millisecond
+	return time.Duration(HeartbeatTime) * time.Millisecond
 }
 
 func ElectionTimeout() time.Duration {
-	// return time.Duration(ElectionTime+globalRand.Intn(ElectionTime)) * time.Millisecond
-	return time.Duration(150+rand.Intn(200)) * time.Millisecond
+	return time.Duration(ElectionTime+globalRand.Intn(ElectionTime)) * time.Millisecond
+	// 	return time.Duration(150+rand.Intn(200)) * time.Millisecond
 }
 
 func (rf *Raft) GenRequestVoteArgs() RequestVoteArgs {
@@ -122,6 +122,7 @@ func (rf *Raft) appendNewLog(command interface{}) LogEntry {
 	}
 	rf.matchIndex[rf.me], rf.nextIndex[rf.me] = newLog.Index, newLog.Index+1
 	rf.logs = append(rf.logs, newLog)
+	rf.persist()
 	return newLog
 }
 
@@ -142,4 +143,34 @@ func (rf *Raft) genAppendEntries(prevLogIndex int) AppendEntriesArgs {
 
 func (rf *Raft) newAppendEntriesReply() AppendEntriesReply {
 	return AppendEntriesReply{}
+}
+
+func (rf *Raft) genInstallSnapshotArgs() InstallSnapshotArgs {
+	firstLog := rf.getFirstLog()
+	args := InstallSnapshotArgs{
+		Term:              rf.currentTerm,
+		LeaderId:          rf.me,
+		LastIncludedIndex: firstLog.Index,
+		LastIncludedTerm:  firstLog.Term,
+		Data:              rf.persister.ReadSnapshot(),
+	}
+	return args
+}
+
+func (rf *Raft) newInstallSnapshotReply() InstallSnapshotReply {
+	return InstallSnapshotReply{}
+}
+
+func shrinkEntriesArray(entries []LogEntry) []LogEntry {
+	// We replace the array if we're using less than half of the space in
+	// it. This number is fairly arbitrary, chosen as an attempt to balance
+	// memory usage vs number of allocations. It could probably be improved
+	// with some focused tuning.
+	const lenMultiple = 2
+	if len(entries)*lenMultiple < cap(entries) {
+		newEntries := make([]LogEntry, len(entries))
+		copy(newEntries, entries)
+		return newEntries
+	}
+	return entries
 }

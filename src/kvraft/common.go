@@ -1,12 +1,46 @@
 package kvraft
 
+import "time"
+
+type OperationOp uint8
+
+const ExecuteTimeout = 500 * time.Millisecond
+
 const (
-	OK             = "OK"
-	ErrNoKey       = "ErrNoKey"
-	ErrWrongLeader = "ErrWrongLeader"
+	OpPut OperationOp = iota
+	OpAppend
+	OpGet
 )
 
-type Err string
+type Err uint8
+
+const (
+	OK Err = iota
+	ErrNoKey
+	ErrWrongLeader
+	ErrTimeout
+)
+
+type OperationContext struct {
+	MaxAppliedCommandId int64
+	LastReply           *CommandReply
+}
+
+type CommandArgs struct {
+	Key       string
+	Value     string
+	Op        OperationOp
+	ClientId  int64
+	CommandId int64
+}
+
+type CommandReply struct {
+	Err   Err
+	Value string
+}
+type Command struct {
+	*CommandArgs
+}
 
 // Put or Append
 type PutAppendArgs struct {

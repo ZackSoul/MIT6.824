@@ -1,13 +1,18 @@
 package kvraft
 
-import "6.5840/labrpc"
-import "crypto/rand"
-import "math/big"
+import (
+	"crypto/rand"
+	"math/big"
 
+	"6.5840/labrpc"
+)
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
+	leaderId  int64
+	clientId  int64
+	commandId int64
 }
 
 func nrand() int64 {
@@ -21,6 +26,9 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// You'll have to add code here.
+	ck.leaderId = 0
+	ck.clientId = nrand()
+	ck.commandId = 0
 	return ck
 }
 
@@ -35,9 +43,8 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 // must match the declared types of the RPC handler function's
 // arguments. and reply must be passed as a pointer.
 func (ck *Clerk) Get(key string) string {
-
 	// You will have to modify this function.
-	return ""
+	return ck.Command(&CommandArgs{Key: key, Op: OpGet})
 }
 
 // shared by Put and Append.
@@ -48,13 +55,26 @@ func (ck *Clerk) Get(key string) string {
 // the types of args and reply (including whether they are pointers)
 // must match the declared types of the RPC handler function's
 // arguments. and reply must be passed as a pointer.
-func (ck *Clerk) PutAppend(key string, value string, op string) {
-	// You will have to modify this function.
-}
+// func (ck *Clerk) PutAppend(key string, value string, op string) {
+// 	// You will have to modify this function.
+// }
 
 func (ck *Clerk) Put(key string, value string) {
-	ck.PutAppend(key, value, "Put")
+	ck.Command(&CommandArgs{Key: key, Value: value, Op: OpPut})
 }
 func (ck *Clerk) Append(key string, value string) {
-	ck.PutAppend(key, value, "Append")
+	ck.Command(&CommandArgs{Key: key, Value: value, Op: OpAppend})
+}
+
+func (ck *Clerk) Command(args *CommandArgs) string {
+	args.ClientId, args.CommandId = ck.clientId, ck.commandId
+	for {
+		var reply CommandReply
+		if !ck.servers[ck.leaderId].Call("KVServer.Command", args, &reply) || reply.Err == ErrWrongLeader || reply.Err == ErrTimeout {
+			ck.leaderId = (ck.leaderId + 1) % int64(len(ck.servers))
+			continue
+		}
+		ck.commandId++
+		return reply.Value
+	}
 }

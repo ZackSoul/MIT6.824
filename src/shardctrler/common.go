@@ -1,5 +1,7 @@
 package shardctrler
 
+import "time"
+
 //
 // Shard controler: assigns shards to replication groups.
 //
@@ -28,11 +30,53 @@ type Config struct {
 	Groups map[int][]string // gid -> servers[]
 }
 
+type Err uint8
+
 const (
-	OK = "OK"
+	OK Err = iota
+	ErrWrongLeader
+	ErrTimeout
 )
 
-type Err string
+const ExecuteTimeout = 500 * time.Millisecond
+
+func DefaultConfig() Config {
+	return Config{Groups: make(map[int][]string)}
+}
+
+type Command struct {
+	*CommandRequest
+}
+
+type CommandRequest struct {
+	Servers   map[int][]string
+	GIDs      []int
+	Shard     int
+	GID       int
+	Num       int
+	Op        OperationOp
+	ClientId  int64
+	CommandId int64
+}
+
+type CommandResponse struct {
+	Err    Err
+	Config Config
+}
+
+type OperationContext struct {
+	MaxAppliedCommandId int64
+	LastResponse        *CommandResponse
+}
+
+type OperationOp uint8
+
+const (
+	OpJoin OperationOp = iota
+	OpLeave
+	OpMove
+	OpQuery
+)
 
 type JoinArgs struct {
 	Servers map[int][]string // new GID -> servers mappings
